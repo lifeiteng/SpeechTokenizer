@@ -66,6 +66,7 @@ class ResidualVectorQuantizer(nn.Module):
             threshold_ema_dead_code=self.threshold_ema_dead_code,
         )
 
+    @torch.jit.ignore
     def forward(self, x: torch.Tensor, n_q: tp.Optional[int] = None, layers: tp.Optional[list] = None) -> QuantizedResult:
         """Residual vector quantization on the given input tensor.
         Args:
@@ -83,7 +84,7 @@ class ResidualVectorQuantizer(nn.Module):
         quantized, codes, commit_loss, quantized_list = self.vq(x, n_q=n_q, layers=layers)
         return quantized, codes, torch.mean(commit_loss), quantized_list
 
-
+    @torch.jit.export
     def encode(self, x: torch.Tensor, n_q: tp.Optional[int] = None, st: tp.Optional[int] = None) -> torch.Tensor:
         """Encode a given input tensor with the specified sample rate at the given bandwidth.
         The RVQ encode method sets the appropriate number of quantizer to use
@@ -93,11 +94,14 @@ class ResidualVectorQuantizer(nn.Module):
             n_q (int): Number of quantizer used to quantize. Default: All quantizers.
             st (int): Start to encode input from which layers. Default: 0.
         """
-        n_q = n_q if n_q else self.n_q
-        st = st or 0
+        if n_q is None:
+            n_q = self.n_q
+        if st is None:
+            st = 0
         codes = self.vq.encode(x, n_q=n_q, st=st)
         return codes
 
+    @torch.jit.export
     def decode(self, codes: torch.Tensor, st: int = 0) -> torch.Tensor:
         """Decode the given codes to the quantized representation.
         Args:
